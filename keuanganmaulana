@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAULANA MBANKING</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #eef2f7; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        
+        /* Animasi Judul Bergerak */
+        .moving-title { 
+            text-align: center; 
+            color: #0056b3; 
+            margin-bottom: 5px;
+            animation: pulse 2s infinite ease-in-out;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); color: #007bff; }
+            100% { transform: scale(1); }
+        }
+
+        /* Teks Berjalan */
+        .marquee-text {
+            background-color: #f1f3f5;
+            padding: 5px 0;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            color: #555;
+            font-size: 14px;
+            font-style: italic;
+        }
+
+        .balance-card { background: linear-gradient(135deg, #007bff, #0056b3); color: white; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 30px; }
+        .balance-card h2 { margin: 0; font-size: 14px; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px; }
+        .balance-card .amount { font-size: 32px; font-weight: bold; margin-top: 10px; }
+        
+        form { display: grid; grid-template-columns: 1fr 1fr 1fr 1.5fr; gap: 10px; margin-bottom: 30px; background: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px solid #e9ecef; }
+        input, select, button { padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
+        button { background-color: #28a745; color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; grid-column: span 4; }
+        button:hover { background-color: #218838; }
+
+        .transactions { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; min-width: 600px; }
+        th { background-color: #f1f3f5; color: #495057; text-align: left; padding: 12px; border-bottom: 2px solid #dee2e6; font-size: 13px; }
+        td { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+        
+        .income { color: #28a745; font-weight: bold; }
+        .expense { color: #dc3545; font-weight: bold; }
+        .delete-btn { color: #adb5bd; border: none; background: none; cursor: pointer; font-size: 18px; transition: 0.2s; }
+        .delete-btn:hover { color: #dc3545; }
+        
+        @media (max-width: 768px) { form { grid-template-columns: 1fr 1fr; } button { grid-column: span 2; } }
+        @media (max-width: 480px) { form { grid-template-columns: 1fr; } button { grid-column: span 1; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="moving-title">MAULANA MBANKING</div>
+        
+        <div class="marquee-text">
+            <marquee scrollamount="5">Selamat Datang di MAULANA MBANKING - Pantau terus pemasukan dan pengeluaran Anda secara bijak - Layanan Mutasi Rekening Digital Terpercaya.</marquee>
+        </div>
+        
+        <div class="balance-card">
+            <h2>Total Saldo Tersedia</h2>
+            <div class="amount">Rp <span id="totalBalance">0</span></div>
+        </div>
+        
+        <form id="transactionForm">
+            <input type="date" id="dateInput" required>
+            <select id="type" required>
+                <option value="">Pilih Jenis</option>
+                <option value="income">Pemasukan (+)</option>
+                <option value="expense">Pengeluaran (-)</option>
+            </select>
+            <input type="number" id="amount" placeholder="Nominal (Rp)" required>
+            <input type="text" id="description" placeholder="Keterangan Transaksi" required>
+            <button type="submit">Tambah Transaksi Baru</button>
+        </form>
+        
+        <div class="transactions">
+            <h3>Mutasi Rekening</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tanggal</th>
+                        <th>Keterangan</th>
+                        <th>Jenis</th>
+                        <th>Jumlah</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+        document.getElementById('dateInput').valueAsDate = new Date();
+
+        function migrateData() {
+            let hasChanged = false;
+            let startDate = new Date(2026, 0, 5);
+
+            transactions.forEach((t, index) => {
+                if (index < 5) {
+                    t.description = "di abah";
+                    hasChanged = true;
+                }
+
+                if (!t.date || index < 5) {
+                    let currentDataDate = new Date(startDate);
+                    currentDataDate.setDate(startDate.getDate() + index);
+                    
+                    t.date = currentDataDate.toLocaleDateString('id-ID', { 
+                        day: '2-digit', month: 'short', year: 'numeric' 
+                    });
+                    t.rawDate = currentDataDate.toISOString().split('T')[0];
+                    hasChanged = true;
+                }
+            });
+
+            if (hasChanged) saveToLocal();
+        }
+
+        const totalBalanceEl = document.getElementById('totalBalance');
+        const tableBody = document.getElementById('transactionTableBody');
+        const form = document.getElementById('transactionForm');
+
+        function updateBalance() {
+            const total = transactions.reduce((sum, t) => sum + (t.type === 'income' ? Number(t.amount) : -Number(t.amount)), 0);
+            totalBalanceEl.textContent = total.toLocaleString('id-ID');
+        }
+
+        function renderTransactions() {
+            tableBody.innerHTML = '';
+            const sortedData = [...transactions].sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate));
+
+            sortedData.forEach((t) => {
+                const originalIndex = transactions.indexOf(t);
+                const row = document.createElement('tr');
+                const sign = t.type === 'income' ? '+' : '-';
+                const classColor = t.type === 'income' ? 'income' : 'expense';
+                
+                row.innerHTML = `
+                    <td>${t.date}</td>
+                    <td>${t.description}</td>
+                    <td class="${classColor}">${t.type === 'income' ? 'Masuk' : 'Keluar'}</td>
+                    <td class="${classColor}">${sign} Rp ${Number(t.amount).toLocaleString('id-ID')}</td>
+                    <td><button class="delete-btn" title="Hapus" onclick="deleteTransaction(${originalIndex})">🗑</button></td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        function deleteTransaction(index) {
+            if(confirm('Hapus transaksi ini?')) {
+                transactions.splice(index, 1);
+                saveAndRefresh();
+            }
+        }
+
+        function saveToLocal() {
+            localStorage.setItem('transactions', JSON.stringify(transactions));
+        }
+
+        function saveAndRefresh() {
+            saveToLocal();
+            updateBalance();
+            renderTransactions();
+        }
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const dateVal = document.getElementById('dateInput').value;
+            const type = document.getElementById('type').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const description = document.getElementById('description').value;
+            
+            const formattedDate = new Date(dateVal).toLocaleDateString('id-ID', { 
+                day: '2-digit', month: 'short', year: 'numeric' 
+            });
+            
+            transactions.push({ 
+                type, amount, description, 
+                date: formattedDate,
+                rawDate: dateVal 
+            });
+            
+            saveAndRefresh();
+            form.reset();
+            document.getElementById('dateInput').valueAsDate = new Date();
+        });
+
+        migrateData();
+        updateBalance();
+        renderTransactions();
+    </script>
+</body>
+</html>
